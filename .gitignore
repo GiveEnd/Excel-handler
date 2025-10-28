@@ -1,4 +1,6 @@
 tests/
+Result_exsels/
+__pycache__/
 
 api_key.py
 
@@ -6,3 +8,6 @@ merged.xlsx
 Result_Gemini.xlsx
 source_expanded.xlsx
 source.xlsx
+Requst
+
+test.py

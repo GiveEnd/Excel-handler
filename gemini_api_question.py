@@ -4,13 +4,25 @@ import json
 import time
 import openpyxl
 from api_key import API_KEY
+import os
+from datetime import datetime
+
+def run(text_gemini_gui, input_file_gui):
+
+    print("text_gemini1:", text_gemini_gui)
+
+    INPUT_FILE = "merged.xlsx"
+
+    if input_file_gui != 0:
+        print("Используется файл: " + input_file_gui)
+        INPUT_FILE = input_file_gui
+    else:
+        print("Файл не выбран, используется merged.xlsx по умолчанию")   
 
 
-
-def run(input_file, text):
-
-    # INPUT_FILE = "source.xlsx"
-    OUTPUT_FILE = "Result_Gemini.xlsx"
+    timestamp = datetime.now().strftime("%H_%M_%d_%m_%Y")
+    RESULT_FOLDER = "Result_exsels"
+    OUTPUT_FILE = os.path.join(RESULT_FOLDER, f"{timestamp}_Request_Gemini.xlsx")
 
 
     df = pd.read_excel(INPUT_FILE)
@@ -30,38 +42,16 @@ def run(input_file, text):
         # text_row = df.iloc[i,0]
         text_row = df.iloc[i, :]
         text = "\n".join([f"{col_name}: {value}" for col_name, value in zip(df.columns, text_row)])
+        # print(text)
     
 
         client = genai.Client(api_key = API_KEY)
 
         response = client.models.generate_content(
             model="gemini-2.5-flash", 
-            contents=
+            contents= text_gemini_gui +
             """
-            Проанализируй следующий текст и выдели поля:
-            Компания:
-            Страна:
-            Проект:
-            Описание:
-            Стадия:
-            Ссылка:
-            Комментарий:
-            Финансирование:
-            Финансирование конвертация:
-            Пометки для будущей работы с таблицей:
-
-            Если не удается выделить проект, попробуй найти его из описания.
-            Компанию и страну продублируй для каждого проекта из исходной строки (пример Компания: 3GSM GmbH
-            Страна: Австрия), а не из описания проектов.
-            Сопоставь проект и ссылки,комментарии,финансирование,пометки для будущей работы с таблицей с соотвестующим проектом, если не удается - продублируй эти данные для всех проектов, если для каких-то проектов не удалось сопоставить - оставь пустым.
-            В "Финансирование" оставь только число и валюту, без лишнего текста. (пример: Компания 45-8 ENERGY получила финансирование в размере 2,88 млн евро в рамках инвестиционного плана «Франция 2030»
-            - 2,88 млн евро)
-            Если чего-то нет — оставь пустым, если написано "нет данных", то продублируй для всех проектов. 
-            Если в поле Ссылка, с ссылкой есть текст, его тоже нужно писать.
-
-            В поле "финансирование конвертация" попробуй конвертировать валюту (используй актуальные курсы валют) из поля "финансирование" в доллары США и указывай результат с разделением разрядов через "." и знаком "$". ( например:  2,88 млн евро в доллары).
-
-            Верни ответ строго в JSON-формате.
+            Проанализируй следующий текст, верни ответ строго в JSON-формате.
 
             Текст:
             """ + text,
