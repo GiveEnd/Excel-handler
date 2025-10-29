@@ -6,6 +6,9 @@ import gemini_api_question
 from tkinter import ttk
 from tkinter import filedialog
 import os
+import pandas as pd 
+from pandastable import Table, TableModel
+
 
 selected_file_path = "" 
 
@@ -26,6 +29,9 @@ def run_main():
     # запуск main.py
     threading.Thread(target=task).start()
 
+
+
+
 def set_text1():
     status_label1.config(text="Ожидайте...", bg="orange")
 
@@ -36,28 +42,43 @@ def set_text1():
             input_file = selected_file_path
         else:
             input_file = 0
-
-        gemini_api_question.run(text, input_file)
-        status_label1.config(text="Готово", bg="green")
+        
+        try:
+            gemini_api_question.run(text, input_file)
+            status_label1.config(text="Готово", bg="green")
+        except Exception as e:
+            status_label1.config(text="Ошибка", bg="red")
+            messagebox.showerror("Ошибка", f"Ошибка при выполнении:\n{e}")
 
     threading.Thread(target=task, daemon=True).start()
 
 
 
 def add_to_entry(event=None):
-    # Берём выбранное значение из Combobox
+    # выбор значения из Combobox
     selected = combo.get()
-    # Добавляем его в Entry
-    entry1.delete(0, tk.END)  # очищаем Entry
-    entry1.insert(0, selected) # вставляем выбранный текст
+    # добавление его в Entry
+    entry1.delete(0, tk.END)  # очищение Entry
+    entry1.insert(0, selected) # вставка выбранного текста
 
 
 
 
 def choose_file():
+    # global selected_file_path
+    # selected_file_path = filedialog.askopenfilename()
     global selected_file_path
-    selected_file_path = filedialog.askopenfilename()
-
+    path = filedialog.askopenfilename(
+        title="Выберите файл",
+        filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
+    )
+    print(path)
+    if path:
+        selected_file_path = path
+        file_label.config(text=os.path.basename(path))
+    else:
+        selected_file_path = ""
+        file_label.config(text="Файл не выбран")
 
 
 
@@ -115,8 +136,10 @@ combo.pack(side=tk.LEFT)
 # combo.pack(fill="x")
 combo.bind("<<ComboboxSelected>>", add_to_entry)  # событие выбора
 
-#выбор файла
+# выбор файла
 choose_btn = tk.Button(frame2, text="Выбрать файл...", command=choose_file)
 choose_btn.pack(side=tk.LEFT, padx=(10,0))
+file_label = tk.Label(frame2, text="Файл не выбран")
+file_label.pack(side=tk.LEFT)
 
 root.mainloop()
