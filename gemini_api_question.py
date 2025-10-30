@@ -37,7 +37,7 @@ def run(text_gemini_gui, input_file_gui):
         data_df = pd.DataFrame()  # если файла нет, создается пустой DataFrame
         data_df.to_excel(OUTPUT_FILE, index=False)
 
-    for i in range(min(len(df), 10)):
+    for i in range(min(len(df), 1)):
 
         # text_row = df.iloc[i,0]
         text_row = df.iloc[i, :]
@@ -100,9 +100,8 @@ def run(text_gemini_gui, input_file_gui):
     duration = end_time - start_time
     print(f"Готово, сек {duration}")
 
-    # print(response.text)
-
-    print("gemini_apy.py выполнен")
+    print("gemini_api_question.run выполнен, создан файл:", OUTPUT_FILE)
+    return OUTPUT_FILE
 
 if __name__ == "__main__":
     run()

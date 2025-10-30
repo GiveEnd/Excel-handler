@@ -20,7 +20,7 @@ def run_main():
         try:
             # запуск main.py
             main.main()
-            # После завершения — обновляем статус
+            # после завершения - обновление статуса
             status_label.config(text="Готово", bg="green")
         except Exception as e:
             status_label.config(text="Ошибка", bg="red")
@@ -36,6 +36,7 @@ def set_text1():
     status_label1.config(text="Ожидайте...", bg="orange")
 
     def task():
+        global selected_file_path
         text = entry1.get()   
 
         if selected_file_path:
@@ -44,8 +45,21 @@ def set_text1():
             input_file = 0
         
         try:
-            gemini_api_question.run(text, input_file)
+            new_file_path = gemini_api_question.run(text, input_file) # получение нового файла и отправка данных
             status_label1.config(text="Готово", bg="green")
+            selected_file_path = new_file_path
+
+            # проверка, что окно с таблицой открыто 
+            table_window = window_check_title("Просмотр таблицы")
+            if table_window:
+                df = pd.read_excel(new_file_path)
+                for frame in table_window.winfo_children():
+                    for widget in frame.winfo_children():
+                        if isinstance(widget, Table):
+                            widget.updateModel(TableModel(df))
+                            widget.redraw()
+                            break
+
         except Exception as e:
             status_label1.config(text="Ошибка", bg="red")
             messagebox.showerror("Ошибка", f"Ошибка при выполнении:\n{e}")
@@ -65,7 +79,6 @@ def add_to_entry(event=None):
 
 
 def choose_file():
-    # global selected_file_path
     # selected_file_path = filedialog.askopenfilename()
     global selected_file_path
     path = filedialog.askopenfilename(
@@ -82,10 +95,53 @@ def choose_file():
 
 
 
+
+def show_table():
+
+    if not selected_file_path:
+        messagebox.showinfo("Ошибка", "Файл не выбран.")
+        return
+    
+    # создание нового окна
+    win = tk.Toplevel(root)
+    center_window(win, 1000, 700)
+    win.title("Просмотр таблицы")
+
+    frame4 = tk.Frame(win)
+    frame4.pack(fill=tk.BOTH, expand=True)
+    df = pd.read_excel(selected_file_path)
+    table = Table(frame4, dataframe=df, showtoolbar=True, showstatusbar=True)
+    table.show()
+
+
+
+
+
+def center_window(win, width, height): # центрирование окон
+    screen_width = win.winfo_screenwidth()
+    screen_height = win.winfo_screenheight()
+    x = (screen_width - width) // 2
+    y = (screen_height - height) // 2
+    win.geometry(f"{width}x{height}+{x}+{y}")
+
+
+
+
+def window_check_title(title): # проверка активности окна и возврат объекта окна
+    for w in root.winfo_children():
+        if isinstance(w, tk.Toplevel) and w.title() == title:
+            return w
+    return None
+
+
+
+
 # создание окна
 root = tk.Tk()
 root.title("Project")
-root.geometry("700x250")
+# root.geometry("1000x300")
+center_window(root, 1000, 500)
+
 
 # разбивка таблицы
 frame0 = tk.Frame(root)
@@ -136,10 +192,26 @@ combo.pack(side=tk.LEFT)
 # combo.pack(fill="x")
 combo.bind("<<ComboboxSelected>>", add_to_entry)  # событие выбора
 
+
+
+
 # выбор файла
 choose_btn = tk.Button(frame2, text="Выбрать файл...", command=choose_file)
 choose_btn.pack(side=tk.LEFT, padx=(10,0))
 file_label = tk.Label(frame2, text="Файл не выбран")
 file_label.pack(side=tk.LEFT)
+
+
+
+
+# отображение таблицы
+frame3 = tk.Frame(root)
+frame3.pack(pady=10, padx=10, fill="x")
+
+show_table_btn = tk.Button(frame3, text="Показать таблицу", command=show_table)
+show_table_btn.pack(side=tk.LEFT, padx=(0,10))
+
+# отображение pandastable
+frame_table = tk.Frame(root, relief=tk.SUNKEN, borderwidth=1)
 
 root.mainloop()
