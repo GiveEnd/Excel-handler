@@ -47,7 +47,7 @@ def set_text1():
         try:
             new_file_path = gemini_api_question.run(text, input_file) # получение нового файла и отправка данных
             status_label1.config(text="Готово", bg="green")
-            selected_file_path = new_file_path
+            file_label.config(text=os.path.basename(new_file_path))
 
             # проверка, что окно с таблицой открыто 
             table_window = window_check_title("Просмотр таблицы")

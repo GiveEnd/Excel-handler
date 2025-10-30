@@ -37,7 +37,7 @@ def run(text_gemini_gui, input_file_gui):
         data_df = pd.DataFrame()  # если файла нет, создается пустой DataFrame
         data_df.to_excel(OUTPUT_FILE, index=False)
 
-    for i in range(min(len(df), 1)):
+    for i in range(min(len(df), 10)):
 
         # text_row = df.iloc[i,0]
         text_row = df.iloc[i, :]
