@@ -2,7 +2,7 @@ import pandas as pd
 
 def run():
     INPUT_FILE1 = "source.xlsx"
-    INPUT_FILE2 = "Result_Gemini.xlsx"
+    INPUT_FILE2 = "Result_GigaChat.xlsx"
     EX_FILE = "source_expanded.xlsx"
 
     df1 = pd.read_excel(INPUT_FILE1)

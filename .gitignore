@@ -3,11 +3,14 @@ Result_exsels/
 __pycache__/
 
 api_key.py
+api_key_gigachat.py
 
 merged.xlsx
 Result_Gemini.xlsx
 source_expanded.xlsx
 source.xlsx
+Result_GigaChat.xlsx
+merged_gigachat_finalfile.xlsx
 Requst
 
 test.py

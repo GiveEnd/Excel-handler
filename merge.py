@@ -31,7 +31,7 @@ def run():
 
     ], axis=1)
 
-    new_df.to_excel("merged.xlsx", index=False)
+    new_df.to_excel(OUTPUT_FILE, index=False)
 
     # подсчет для оформлениия
     col = df2.iloc[:, 0]

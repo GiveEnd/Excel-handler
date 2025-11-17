@@ -3,6 +3,7 @@ from tkinter import messagebox
 import threading
 import main
 import gemini_api_question
+import gigachat_api_question
 from tkinter import ttk
 from tkinter import filedialog
 import os
@@ -19,7 +20,7 @@ def run_main():
     def task():
         try:
             # запуск main.py
-            main.main()
+            main.main(API_KEY)
             # после завершения - обновление статуса
             status_label.config(text="Готово", bg="green")
         except Exception as e:
@@ -45,8 +46,9 @@ def set_text1():
             input_file = 0
         
         try:
-            new_file_path = gemini_api_question.run(text, input_file) # получение нового файла и отправка данных
+            new_file_path = gigachat_api_question.run(text, input_file, API_KEY) # получение нового файла и отправка данных
             status_label1.config(text="Готово", bg="green")
+            selected_file_path = new_file_path
             file_label.config(text=os.path.basename(new_file_path))
 
             # проверка, что окно с таблицой открыто 
@@ -136,6 +138,13 @@ def window_check_title(title): # проверка активности окна 
 
 
 
+def on_api_key_change(*args):
+    global API_KEY
+    API_KEY = api_key_var.get()
+    # print("Текущий API ключ:", API_KEY)
+
+
+
 # создание окна
 root = tk.Tk()
 root.title("Project")
@@ -213,5 +222,16 @@ show_table_btn.pack(side=tk.LEFT, padx=(0,10))
 
 # отображение pandastable
 frame_table = tk.Frame(root, relief=tk.SUNKEN, borderwidth=1)
+
+# вставка api
+frame_api = tk.Frame(root)
+frame_api.pack(pady=10, padx=10, fill="x")
+
+tk.Label(frame_api, text="API ключ:", font=("Arial", 12)).pack(anchor="w")
+
+api_key_var = tk.StringVar() 
+entry_api = tk.Entry(frame_api, font=("Arial", 11), textvariable=api_key_var,)
+entry_api.pack(side=tk.LEFT, expand=True, fill="x", padx=(0,10))
+api_key_var.trace_add("write", on_api_key_change)
 
 root.mainloop()
