@@ -1,6 +1,7 @@
 tests/
 Result_exsels/
 __pycache__/
+venv/
 
 api_key.py
 api_key_gigachat.py
@@ -12,5 +13,6 @@ source.xlsx
 Result_GigaChat.xlsx
 merged_gigachat_finalfile.xlsx
 Requst
+gold_source.xlsx
 
 test.py

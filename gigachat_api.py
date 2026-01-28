@@ -25,7 +25,7 @@ def run(API_KEY):
         verify_ssl_certs=False
     )       
 
-    for i in range(min(len(df), 100)):
+    for i in range(min(len(df), 15)):
         text_row = df.iloc[i, :]
         text = "\n".join([f"{col}: {val}" for col, val in zip(df.columns, text_row)])
 
