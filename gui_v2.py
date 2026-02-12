@@ -14,9 +14,11 @@ logger = logging.getLogger("excel_app")
 logger.setLevel(logging.DEBUG)
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
-    def __init__(self, *args, obj=None, **kwargs):
+    def __init__(self, app_context, *args, obj=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.app_context = app_context
         self.setupUi(self)
+        
 
         self.drop_label = DropLabel(self.widget)
         self.drop_label.setGeometry(self.label_dropfile.geometry())
@@ -48,6 +50,20 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         )
 
         logger.addHandler(self.qt_log_handler)
+
+        # сохранение логов в файл
+        log_file_path = self.app_context.session_dir / "log.txt"
+        file_handler = logging.FileHandler(log_file_path, encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)
+
+        file_handler.setFormatter(
+            logging.Formatter(
+                "[%(asctime)s] %(levelname)s: %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S"
+            )
+        )
+
+        logger.addHandler(file_handler)
 
         self.pushButton_logs.clicked.connect(self.show_logs)
 
@@ -85,14 +101,20 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
           self.log_window.show()
           self.log_window.raise_()
           self.log_window.activateWindow()
+
+    def closeEvent(self, event):
+        logger.removeHandler(self.qt_log_handler)
+        self.qt_log_handler.close()
+        super().closeEvent(event)
+      
    
 
 
+def run_gui(app_context):
+    app = QtWidgets.QApplication(sys.argv)
+    app.setStyle("Fusion")
 
+    window = MainWindow(app_context=app_context)
+    window.show()
 
-app = QtWidgets.QApplication(sys.argv)
-app.setStyle("Fusion")
-
-window = MainWindow()
-window.show()
-app.exec()
+    app.exec()
