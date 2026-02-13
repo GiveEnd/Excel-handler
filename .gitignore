@@ -2,6 +2,7 @@ tests/
 Result_exsels/
 __pycache__/
 venv/
+handler data/
 
 api_key.py
 api_key_gigachat.py

@@ -18,6 +18,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         super().__init__(*args, **kwargs)
         self.app_context = app_context
         self.setupUi(self)
+        self.current_df = None
+        self.current_file_path = None
         
 
         self.drop_label = DropLabel(self.widget)
@@ -25,6 +27,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.drop_label.setStyleSheet(self.label_dropfile.styleSheet())
         self.drop_label.setAlignment(self.label_dropfile.alignment())
         self.drop_label.setText(self.label_dropfile.text())
+        
 
         self.label_dropfile.deleteLater()
         self.label_dropfile = self.drop_label
@@ -33,6 +36,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.drop_label.fileDropped.connect(self.load_excel)
         self.pushButton_fileinput.clicked.connect(self.open_file_dialog)
+
+        self.action_saveas_2.triggered.connect(self.save_as_file)
 
         # логи
         self.log_window = LogWindow(self)
@@ -85,6 +90,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         try:
             df = pd.read_excel(path)
+            self.current_df = df
+            self.current_file_path = path
             model = PandasModel(df)
             self.tableView.setModel(model)
             self.tableView.resizeColumnsToContents()
@@ -96,6 +103,43 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         except Exception as e:
             logger.exception("Ошибка при загрузке Excel файла")
             QtWidgets.QMessageBox.critical(self, "Ошибка", str(e))
+
+    def save_as_file(self):
+        if self.current_df is None:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Предупреждение",
+                "Нет файла для сохранения"
+            )
+            logger.warning("Попытка сохранить без файла")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Сохранить как",
+            "",
+            "Excel Files (*.xlsx)"
+        )
+
+        if file_path:
+            try:
+                self.current_df.to_excel(file_path, index=False)
+
+                logger.info(f"Файл успешно сохранён как: {file_path}")
+
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Успешно",
+                    "Файл успешно сохранён"
+                )
+
+            except Exception as e:
+                logger.exception("Ошибка при сохранении файла")
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Ошибка сохранения",
+                    str(e)
+              )        
 
     def show_logs(self):
           self.log_window.show()
