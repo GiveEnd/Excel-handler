@@ -10,6 +10,9 @@ from models import PandasModel
 from log_window import LogWindow
 from qt_log_handler import QtLogHandler
 
+from config_manager import ConfigManager
+from config_dialog import ConfigDialog
+
 logger = logging.getLogger("excel_app")
 logger.setLevel(logging.DEBUG)
 
@@ -38,6 +41,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pushButton_fileinput.clicked.connect(self.open_file_dialog)
 
         self.action_saveas_2.triggered.connect(self.save_as_file)
+
+        self.action_configuration_2.triggered.connect(self.open_configuration)
+
 
         # логи
         self.log_window = LogWindow(self)
@@ -140,6 +146,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     "Ошибка сохранения",
                     str(e)
               )        
+    def open_configuration(self):
+        from config_dialog import ConfigDialog
+
+        dialog = ConfigDialog(self.config_manager)
+        dialog.exec()
 
     def show_logs(self):
           self.log_window.show()
@@ -158,7 +169,16 @@ def run_gui(app_context):
     app = QtWidgets.QApplication(sys.argv)
     app.setStyle("Fusion")
 
+    config_manager = ConfigManager(app_context)
+
+    # проверка при запуске
+    if not config_manager.get_api_key():
+        dialog = ConfigDialog(config_manager)
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return  # если пользователь закрыл окно    
+
     window = MainWindow(app_context=app_context)
+    window.config_manager = config_manager
     window.show()
 
     app.exec()
