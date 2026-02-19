@@ -56,6 +56,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pushButton_back.clicked.connect(self.go_back)
         self.pushButton_forward.clicked.connect(self.go_forward)
         self.pushButton.clicked.connect(self.show_history)
+        self.pushButton_normalize.clicked.connect(self.on_normalize_clicked)
 
         self.update_navigation_buttons() # дизайн кнопок истории
 
@@ -213,7 +214,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         super().closeEvent(event)
 
     def on_start_clicked(self):
-
+        
         prompt_text = self.plainTextEdit.toPlainText().strip()
 
         if not prompt_text:
@@ -337,6 +338,61 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pushButton_back.setEnabled(self.history_manager.can_go_back())
         self.pushButton_forward.setEnabled(self.history_manager.can_go_forward())
 
+    def on_normalize_clicked(self):
+
+        start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        if self.current_df is None:
+            QtWidgets.QMessageBox.warning(self, "Предупреждение", "Файл не загружен")
+            logger.warning("Попытка запуска обработки без загруженного файла")
+            return
+        logger.info("Запуск нормализации файла")
+
+        df = self.current_df
+        n_rows = self.spinBox.value()
+
+        save_file_path = self.app_context.save_dir
+
+        # сброс прогрессбара
+        self.progressBar.setValue(0)
+
+        try:
+            from gigachat_api_normalize import run
+
+            output_path = run(
+                df=df,
+                num_rows=n_rows,
+                save_dir=save_file_path,
+                app_context=self.app_context,
+                progress_callback=self.update_progress
+            )
+
+            # загрузка результата
+            result_df = pd.read_excel(output_path)
+            self.current_df = result_df
+
+            model = PandasModel(result_df)
+            self.tableView.setModel(model)
+            self.tableView.resizeColumnsToContents()
+
+            self.label_filepath.setText("Текущий файл: " + output_path)
+
+            logger.info(f"Создан нормализованный файл: {output_path}")
+
+            end_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # добавление в историю
+            self.history_manager.add_prompt_history(
+                prompt="Нормализация данных",
+                file_path=output_path,
+                start_time=start_time,
+                end_time=end_time
+            )
+            logger.info("История обновлена: добавлен промт для файла %s", output_path)
+            self.update_navigation_buttons()
+
+        except Exception as e:
+            logger.exception("Ошибка при нормализации")
+            QtWidgets.QMessageBox.critical(self, "Ошибка", str(e))
 
       
    
