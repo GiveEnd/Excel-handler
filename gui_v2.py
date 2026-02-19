@@ -19,6 +19,52 @@ from history_dialog import HistoryDialog
 
 import os
 
+from PyQt6.QtCore import QThread, pyqtSignal
+
+class ProcessingThread(QThread):
+    progress = pyqtSignal(int, int)      # для прогрессбара
+    finished = pyqtSignal(str, str)      # output_path, end_time
+    error = pyqtSignal(str)              # текст ошибки
+
+    def __init__(self, run_function, df, save_dir, app_context, num_rows=None, prompt_text=None):
+        """
+        run_function - функция обработки
+        df - текущий DataFrame
+        """
+        super().__init__()
+        self.run_function = run_function
+        self.df = df
+        self.save_dir = save_dir
+        self.app_context = app_context
+        self.num_rows = num_rows
+        self.prompt_text = prompt_text
+        self.start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    def run(self):
+        try:
+            kwargs = {
+                "df": self.df,
+                "save_dir": self.save_dir,
+                "app_context": self.app_context,
+                "progress_callback": self.emit_progress
+            }
+
+            if self.num_rows is not None:
+                kwargs["num_rows"] = self.num_rows
+            if self.prompt_text is not None:
+                kwargs["prompt_text"] = self.prompt_text
+
+            output_path = self.run_function(**kwargs)
+            end_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.finished.emit(output_path, end_time)
+
+        except Exception as e:
+            self.error.emit(str(e))
+
+    def emit_progress(self, current, total):
+        self.progress.emit(current, total)
+
+
 logger = logging.getLogger("excel_app")
 logger.setLevel(logging.DEBUG)
 
@@ -214,81 +260,71 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         super().closeEvent(event)
 
     def on_start_clicked(self):
-        
+
         prompt_text = self.plainTextEdit.toPlainText().strip()
 
         if not prompt_text:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Ошибка",
-                "Поле ввода не должно быть пустым"
-            )
+            QtWidgets.QMessageBox.warning(self, "Ошибка", "Поле ввода не должно быть пустым")
             logger.warning("Попытка запуска обработки с пустым промтом")
             return
         
-        start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
         if self.current_df is None:
             QtWidgets.QMessageBox.warning(self, "Предупреждение", "Файл не загружен")
             logger.warning("Попытка запуска обработки без загруженного файла")
             return
-        
-        
 
-        logger.info("Запуск обработки файла")
 
         df = self.current_df
         n_rows = self.spinBox.value()
 
         save_file_path = self.app_context.save_dir
 
-        # сброс прогрессбара
         self.progressBar.setValue(0)
 
-        try:
-            from gigachat_api_question_2 import run
 
-            output_path = run(
-                df=df,
-                prompt_text=prompt_text,
-                num_rows=n_rows,
-                save_dir=save_file_path,
-                progress_callback=self.update_progress,
-                app_context=self.app_context
-            )
+        from gigachat_api_question_2 import run
 
-            # отображение нового файла
-            result_df = pd.read_excel(output_path)
-            self.current_df = result_df
-            model = PandasModel(result_df)
-            self.tableView.setModel(model)
-            self.tableView.resizeColumnsToContents()
+        self.thread = ProcessingThread(
+            run_function=run,
+            df=df,
+            num_rows=n_rows,
+            save_dir=save_file_path,
+            app_context=self.app_context,
+            prompt_text=prompt_text
+        )
 
-            self.label_filepath.setText("Текущий файл: " + output_path)
+        self.thread.progress.connect(self.update_progress)
+        self.thread.finished.connect(self.on_processing_finished)
+        self.thread.error.connect(self.on_processing_error)
 
-            logger.info(f"Создан новый файл: {output_path}")
+        logger.info("Запуск обработки файла в отдельном потоке")
+        self.thread.start()
 
-            end_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
-            # добавление в историю
-            self.history_manager.add_prompt_history(
-                prompt=prompt_text,
-                file_path=output_path,
-                start_time=start_time,
-                end_time=end_time
-            )
-            logger.info("История обновлена: добавлен промт для файла %s", output_path)
-            self.update_navigation_buttons()
+    def on_processing_finished(self, output_path, end_time):
+        result_df = pd.read_excel(output_path)
+        self.current_df = result_df
+        model = PandasModel(result_df)
+        self.tableView.setModel(model)
+        self.tableView.resizeColumnsToContents()
+        self.label_filepath.setText("Текущий файл: " + output_path)
 
-            self.plainTextEdit.clear()
+        logger.info(f"Создан новый файл: {output_path}")
 
+        # добавление в историю
+        self.history_manager.add_prompt_history(
+            prompt=self.plainTextEdit.toPlainText().strip() or "Нормализация данных",
+            file_path=output_path,
+            start_time=self.thread.start_time,
+            end_time=end_time
+        )
+        logger.info(f"История обновлена: {output_path}")
+        self.update_navigation_buttons()
+        self.plainTextEdit.clear()
 
-        except Exception as e:
-            logger.exception("Ошибка при обработке")
-            QtWidgets.QMessageBox.critical(self, "Ошибка", str(e))
+    def on_processing_error(self, error_message):
+        logger.exception("Ошибка при обработке: %s", error_message)
+        QtWidgets.QMessageBox.critical(self, "Ошибка", error_message)
 
-
-            # print(f"API ключ: {api_key}")
 
     def update_progress(self, current, total):
         self.progressBar.setMaximum(total)
@@ -346,6 +382,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             QtWidgets.QMessageBox.warning(self, "Предупреждение", "Файл не загружен")
             logger.warning("Попытка запуска обработки без загруженного файла")
             return
+
         logger.info("Запуск нормализации файла")
 
         df = self.current_df
@@ -356,18 +393,27 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # сброс прогрессбара
         self.progressBar.setValue(0)
 
+        from gigachat_api_normalize import run
+
+        # Создаём поток
+        self.thread = ProcessingThread(
+            run_function=run,
+            df=df,
+            num_rows=n_rows,
+            save_dir=save_file_path,
+            app_context=self.app_context
+        )
+
+        # Подключаем сигналы
+        self.thread.progress.connect(self.update_progress)
+        self.thread.finished.connect(self.on_processing_finished_normalize)
+        self.thread.error.connect(self.on_processing_error)
+
+        logger.info("Нормализация запущена в отдельном потоке")
+        self.thread.start()
+
+    def on_processing_finished_normalize(self, output_path, end_time):
         try:
-            from gigachat_api_normalize import run
-
-            output_path = run(
-                df=df,
-                num_rows=n_rows,
-                save_dir=save_file_path,
-                app_context=self.app_context,
-                progress_callback=self.update_progress
-            )
-
-            # загрузка результата
             result_df = pd.read_excel(output_path)
             self.current_df = result_df
 
@@ -379,20 +425,19 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             logger.info(f"Создан нормализованный файл: {output_path}")
 
-            end_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
             # добавление в историю
             self.history_manager.add_prompt_history(
                 prompt="Нормализация данных",
                 file_path=output_path,
-                start_time=start_time,
+                start_time=self.thread.start_time,
                 end_time=end_time
             )
             logger.info("История обновлена: добавлен промт для файла %s", output_path)
             self.update_navigation_buttons()
 
         except Exception as e:
-            logger.exception("Ошибка при нормализации")
-            QtWidgets.QMessageBox.critical(self, "Ошибка", str(e))
+            self.on_processing_error(str(e))
 
       
    
