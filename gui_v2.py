@@ -3,6 +3,7 @@ from PyQt6 import QtWidgets, uic
 from PyQt6.QtWidgets import QFileDialog
 import pandas as pd
 import logging
+import datetime
 
 from MainWindow import Ui_MainWindow
 from drag_drop import DropLabel
@@ -12,6 +13,11 @@ from qt_log_handler import QtLogHandler
 
 from config_manager import ConfigManager
 from config_dialog import ConfigDialog
+
+from history_manager import HistoryManager
+from history_dialog import HistoryDialog
+
+import os
 
 logger = logging.getLogger("excel_app")
 logger.setLevel(logging.DEBUG)
@@ -23,6 +29,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.current_df = None
         self.current_file_path = None
+
+        self.history_manager = HistoryManager(session_dir=self.app_context.session_dir)
         
 
         self.drop_label = DropLabel(self.widget)
@@ -43,6 +51,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.action_saveas_2.triggered.connect(self.save_as_file)
 
         self.action_configuration_2.triggered.connect(self.open_configuration)
+
+        self.pushButton_start.clicked.connect(self.on_start_clicked)
+        self.pushButton_back.clicked.connect(self.go_back)
+        self.pushButton_forward.clicked.connect(self.go_forward)
+        self.pushButton.clicked.connect(self.show_history)
+
+        self.update_navigation_buttons() # дизайн кнопок истории
+
 
 
         # логи
@@ -102,9 +118,43 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.tableView.setModel(model)
             self.tableView.resizeColumnsToContents()
 
+            # spinbox
+            n_rows = len(df)
+            self.spinBox.setMaximum(n_rows) # макс значение - кол-во строк в файле
+            self.spinBox.setValue(n_rows)
+
             logger.info(
                 f"Файл успешно загружен (строк: {df.shape[0]}, столбцов: {df.shape[1]})"
             )
+
+            # автосохранение файла в папку сессии
+            save_file_path = self.app_context.save_dir
+            if not os.path.exists(save_file_path):
+                os.makedirs(save_file_path)
+
+            base_name = os.path.basename(path)
+            # поиск существующих файлов с таким же именем, чтобы проставить индекс
+            existing_files = [f for f in os.listdir(save_file_path) if "_uploaded_" in f]
+            index = 0
+            if existing_files:
+                indices = []
+                for f in existing_files:
+                    try:
+                        idx = int(f.split("_uploaded_")[0])
+                        indices.append(idx)
+                    except:
+                        continue
+                if indices:
+                    index = max(indices) + 1
+
+            input_copy_name = f"{index}_uploaded_{base_name}"
+            input_copy_path = os.path.join(save_file_path, input_copy_name)
+            df.to_excel(input_copy_path, index=False)
+
+            self.history_manager.add_load_history(path)
+            self.update_navigation_buttons()
+
+            logger.info(f"Файл автоматически сохранён: {input_copy_path}")
 
         except Exception as e:
             logger.exception("Ошибка при загрузке Excel файла")
@@ -161,6 +211,131 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         logger.removeHandler(self.qt_log_handler)
         self.qt_log_handler.close()
         super().closeEvent(event)
+
+    def on_start_clicked(self):
+
+        prompt_text = self.plainTextEdit.toPlainText().strip()
+
+        if not prompt_text:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Поле ввода не должно быть пустым"
+            )
+            logger.warning("Попытка запуска обработки с пустым промтом")
+            return
+        
+        start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        if self.current_df is None:
+            QtWidgets.QMessageBox.warning(self, "Предупреждение", "Файл не загружен")
+            logger.warning("Попытка запуска обработки без загруженного файла")
+            return
+        
+        
+
+        logger.info("Запуск обработки файла")
+
+        df = self.current_df
+        n_rows = self.spinBox.value()
+
+        save_file_path = self.app_context.save_dir
+
+        # сброс прогрессбара
+        self.progressBar.setValue(0)
+
+        try:
+            from gigachat_api_question_2 import run
+
+            output_path = run(
+                df=df,
+                num_rows=n_rows,
+                save_dir=save_file_path,
+                progress_callback=self.update_progress
+            )
+
+            # отображение нового файла
+            result_df = pd.read_excel(output_path)
+            self.current_df = result_df
+            model = PandasModel(result_df)
+            self.tableView.setModel(model)
+            self.tableView.resizeColumnsToContents()
+
+            self.label_filepath.setText("Текущий файл: " + output_path)
+
+            logger.info(f"Создан новый файл: {output_path}")
+
+            end_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # добавление в историю
+            self.history_manager.add_prompt_history(
+                prompt=prompt_text,
+                file_path=output_path,
+                start_time=start_time,
+                end_time=end_time
+            )
+            logger.info("История обновлена: добавлен промт для файла %s", output_path)
+            self.update_navigation_buttons()
+
+            self.plainTextEdit.clear()
+
+
+        except Exception as e:
+            logger.exception("Ошибка при обработке")
+            QtWidgets.QMessageBox.critical(self, "Ошибка", str(e))
+
+
+            # print(f"API ключ: {api_key}")
+
+    def update_progress(self, current, total):
+        self.progressBar.setMaximum(total)
+        self.progressBar.setValue(current)
+
+    def add_to_history(self, path, description=""):
+        self.history_manager.add(path, description)
+        self.update_navigation_buttons()
+
+
+    def go_back(self):
+        record = self.history_manager.go_back()
+        if record:
+            self.load_from_record(record)
+        self.update_navigation_buttons()
+
+    def go_forward(self):
+        record = self.history_manager.go_forward()
+        if record:
+            self.load_from_record(record)
+        self.update_navigation_buttons()
+
+    def load_from_record(self, record):
+        try:
+            df = pd.read_excel(record["file_path"])
+            self.current_df = df
+            self.label_filepath.setText("Текущий файл: " + record["file_path"])
+            # обновление таблицы
+            model = PandasModel(df)
+            self.tableView.setModel(model)
+            self.tableView.resizeColumnsToContents()
+
+            # обновление spinBox
+            self.spinBox.setMaximum(len(df))
+            self.spinBox.setValue(len(df))
+
+            logger.info(f"Файл загружен из истории: {record['file_path']}")
+        except Exception as e:
+            print("Ошибка загрузки:", e)
+
+    def show_history(self):
+        dialog = HistoryDialog(self.history_manager.history)
+        dialog.exec()
+
+
+    def update_navigation_buttons(self):
+        self.pushButton_back.setEnabled(self.history_manager.can_go_back())
+        self.pushButton_forward.setEnabled(self.history_manager.can_go_forward())
+
+
       
    
 
