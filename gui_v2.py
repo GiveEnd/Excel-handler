@@ -249,9 +249,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             output_path = run(
                 df=df,
+                prompt_text=prompt_text,
                 num_rows=n_rows,
                 save_dir=save_file_path,
-                progress_callback=self.update_progress
+                progress_callback=self.update_progress,
+                app_context=self.app_context
             )
 
             # отображение нового файла
