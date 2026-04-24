@@ -319,6 +319,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         )
         logger.info(f"История обновлена: {output_path}")
         self.update_navigation_buttons()
+        n_rows = len(result_df)
+        self.spinBox.setMaximum(n_rows) # макс значение - кол-во строк в файле
+        self.spinBox.setValue(n_rows)
         self.plainTextEdit.clear()
 
     def on_processing_error(self, error_message):
@@ -435,6 +438,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             )
             logger.info("История обновлена: добавлен промт для файла %s", output_path)
             self.update_navigation_buttons()
+            n_rows = len(result_df)
+            self.spinBox.setMaximum(n_rows) # макс значение - кол-во строк в файле
+            self.spinBox.setValue(n_rows)
 
         except Exception as e:
             self.on_processing_error(str(e))

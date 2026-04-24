@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from datetime import datetime
+import sys
 
 class AppContext:
     """Хранит все пути и данные для текущей сессии приложения"""
@@ -21,7 +22,11 @@ def init_app_context():
     """
 
     # папка, где находится exe
-    base_dir = Path(os.path.abspath(os.path.dirname(__file__)))
+    if getattr(sys, "frozen", False):
+        # Если собран exe
+        base_dir = Path(sys.executable).parent
+    else:
+        base_dir = Path(os.path.abspath(os.path.dirname(__file__)))
 
     # папка handler data
     data_dir = base_dir / "handler data"
