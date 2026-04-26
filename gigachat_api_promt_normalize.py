@@ -8,7 +8,7 @@ import openpyxl
 from config_manager import ConfigManager
 
 
-def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context, progress_callback=None):
+def run(df, prompt_text, num_rows, save_dir, column_index, app_context, progress_callback=None, position=None):
     """
     df - текущий DataFrame
     num_rows - сколько строк обработать
@@ -20,19 +20,8 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
 
     config_manager = ConfigManager(app_context)
     api_key = config_manager.get_api_key()
-
-    new_column_name = "Ответ"
  
-    if new_column_name in df.columns:
-        new_column_name = f"Ответ_{len([c for c in df.columns if 'Ответ' in c])}"
-
-    if position == "right":
-        insert_index = column_index + 1
-    else:
-        insert_index = column_index
-
-    df.insert(insert_index, new_column_name, "")      
-
+    column_name = df.columns[column_index]
     total = min(len(df), num_rows)
 
     giga = GigaChat(
@@ -44,9 +33,8 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
 
     for i in range(total):
 
-        text_row = df.iloc[i, :]
-        text = "\n".join([f"{col_name}: {value}" for col_name, value in zip(df.columns, text_row)])
-        print("ТЕКСТ ДЛЯ ОБРАБОТКИ",text)
+        original_value = df.at[i, column_name]
+        
 
         payload = Chat(
             messages=[
@@ -54,19 +42,19 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
                     role=MessagesRole.SYSTEM,
                     content="""
                 Ты - ассистент, который структурирует данные о компаниях и проектах.
-                Твоя задача — заполнить ТОЛЬКО одно поле "Запрос".
+                Твоя задача — преобразовать значение в поле "value".
 
                 ## Формат ответа
                 Ответ строго в виде JSON-массива:
 
                 [
                 {
-                    "Ответ": "...",
+                    "value": "..."
                 }
                 ]
 
                 ## Ограничения
-                - Заполняй ТОЛЬКО поле "Запрос"
+                - Заполняй ТОЛЬКО поле "value"
                 - Не добавляй другие поля
                 - Не изменяй структуру
                 - Никакого Markdown
@@ -79,13 +67,12 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
                 Messages(
                     role=MessagesRole.USER,
                     content=f"""
-                Проанализируй следующий вопрос и текст, чтобы заполнить ответ в поле "Ответ": "...":
-                
-                Вопрос:
+                Инструкция:
                 {prompt_text}
 
-                Текст:
-                {text}
+                Исходное значение:
+                {original_value}
+                Преобразуй его.
                 """
                 )
 
@@ -100,9 +87,10 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
             if isinstance(new_data, list):
                 new_data = new_data[0] if new_data else {}
 
+            new_value = new_data.get("value", original_value)               
             print("ВЫВОД", new_data)
-            df.at[i, new_column_name] = new_data.get("Ответ", "")
-            print(df[new_column_name].unique())
+            df.at[i, column_name] = new_value
+            print(df[column_name].unique())
             # df[new_column_name] = df[new_column_name].fillna("")
             # df[new_column_name] = ( df[new_column_name] .replace(["nan", "NaN", "None", "null"], "") )
 
@@ -118,21 +106,21 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    existing_files = [f for f in os.listdir(save_dir) if f.endswith("_prompt.xlsx")]
+    existing_files = [f for f in os.listdir(save_dir) if f.endswith("_prompt_norm.xlsx")]
 
     index = 1
     if existing_files:
         indices = []
         for f in existing_files:
             try:
-                idx = int(f.split("_prompt.xlsx")[0])
+                idx = int(f.split("_prompt_norm.xlsx")[0])
                 indices.append(idx)
             except:
                 continue
         if indices:
             index = max(indices) + 1
 
-    output_name = f"{index}_prompt.xlsx"
+    output_name = f"{index}_prompt_norm.xlsx"
     output_path = os.path.join(save_dir, output_name)
     df.to_excel(output_path, index=False)
 

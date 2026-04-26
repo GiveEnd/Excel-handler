@@ -8,7 +8,7 @@ import openpyxl
 from config_manager import ConfigManager
 
 
-def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context, progress_callback=None):
+def run(df, prompt_text, num_rows, save_dir, app_context, progress_callback=None):
     """
     df - текущий DataFrame
     num_rows - сколько строк обработать
@@ -16,24 +16,12 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
     progress_callback - обновление прогресса
     """
 
-    print("ТЕКСТ ПРОМТА",prompt_text)
-
     config_manager = ConfigManager(app_context)
     api_key = config_manager.get_api_key()
 
-    new_column_name = "Ответ"
  
-    if new_column_name in df.columns:
-        new_column_name = f"Ответ_{len([c for c in df.columns if 'Ответ' in c])}"
-
-    if position == "right":
-        insert_index = column_index + 1
-    else:
-        insert_index = column_index
-
-    df.insert(insert_index, new_column_name, "")      
-
     total = min(len(df), num_rows)
+    result_rows = []
 
     giga = GigaChat(
         model="GigaChat-2",
@@ -46,29 +34,33 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
 
         text_row = df.iloc[i, :]
         text = "\n".join([f"{col_name}: {value}" for col_name, value in zip(df.columns, text_row)])
-        print("ТЕКСТ ДЛЯ ОБРАБОТКИ",text)
 
         payload = Chat(
             messages=[
                 Messages(
                     role=MessagesRole.SYSTEM,
                     content="""
-                Ты - ассистент, который структурирует данные о компаниях и проектах.
-                Твоя задача — заполнить ТОЛЬКО одно поле "Запрос".
+                Ты — ассистент, который структурирует данные о компаниях и проектах.
 
                 ## Формат ответа
                 Ответ строго в виде JSON-массива:
 
                 [
                 {
-                    "Ответ": "...",
+                    "Компания": "...",
+                    "Страна": "...",
+                    "Проект": "...",
+                    "Описание": "...",
+                    "Стадия": "...",
+                    "Ссылка": "...",
+                    "Комментарий": "...",
+                    "Финансирование": "...",
+                    "Финансирование конвертация": "...",
+                    "Пометки для будущей работы с таблицей": "..."
                 }
                 ]
 
                 ## Ограничения
-                - Заполняй ТОЛЬКО поле "Запрос"
-                - Не добавляй другие поля
-                - Не изменяй структуру
                 - Никакого Markdown
                 - Никаких комментариев
                 - Никакого текста вне JSON
@@ -79,9 +71,8 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
                 Messages(
                     role=MessagesRole.USER,
                     content=f"""
-                Проанализируй следующий вопрос и текст, чтобы заполнить ответ в поле "Ответ": "...":
-                
-                Вопрос:
+                Проанализируй следующий текст и заполни структуру:
+
                 {prompt_text}
 
                 Текст:
@@ -95,24 +86,20 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
         try:
             response = giga.chat(payload)
             new_data = json.loads(response.choices[0].message.content)
-        
+    
+
             # если пришел один объект, перевод его в список
-            if isinstance(new_data, list):
-                new_data = new_data[0] if new_data else {}
+            if isinstance(new_data, dict):
+                new_data = [new_data]
 
-            print("ВЫВОД", new_data)
-            df.at[i, new_column_name] = new_data.get("Ответ", "")
-            print(df[new_column_name].unique())
-            # df[new_column_name] = df[new_column_name].fillna("")
-            # df[new_column_name] = ( df[new_column_name] .replace(["nan", "NaN", "None", "null"], "") )
-
+            result_rows.extend(new_data)
         except Exception as e:
             print(f"Ошибка на строке {i+1}: {e}")
 
         if progress_callback:
             progress_callback(i + 1, total)
 
-
+    result_df = pd.DataFrame(result_rows)
 
     # нумерация 1_prompt
     if not os.path.exists(save_dir):
@@ -134,7 +121,8 @@ def run(df, prompt_text, num_rows, save_dir, column_index, position, app_context
 
     output_name = f"{index}_prompt.xlsx"
     output_path = os.path.join(save_dir, output_name)
-    df.to_excel(output_path, index=False)
+
+    result_df.to_excel(output_path, index=False)
 
     # openpyxl
     wb = openpyxl.load_workbook(output_path)

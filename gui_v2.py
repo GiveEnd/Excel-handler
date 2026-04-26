@@ -107,6 +107,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.action_configuration_2.triggered.connect(self.open_configuration)
 
         self.pushButton_start.clicked.connect(self.on_start_clicked)
+        self.pushButton_start_2.clicked.connect(self.on_column_normalize_clicked)
         self.pushButton_back.clicked.connect(self.go_back)
         self.pushButton_forward.clicked.connect(self.go_forward)
         self.pushButton.clicked.connect(self.show_history)
@@ -329,6 +330,45 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.thread.error.connect(self.on_processing_error)
 
         logger.info("Запуск обработки файла в отдельном потоке")
+        self.thread.start()
+
+    def on_column_normalize_clicked(self):
+        prompt_text = self.plainTextEdit.toPlainText().strip()
+        column_name = self.comboBox_2.currentText()
+        column_index = self.current_df.columns.get_loc(column_name)
+
+        if not prompt_text:
+            QtWidgets.QMessageBox.warning(self, "Ошибка", "Поле ввода не должно быть пустым")
+            logger.warning("Попытка запуска обработки с пустым промтом")
+            return
+
+        if self.current_df is None:
+            QtWidgets.QMessageBox.warning(self, "Предупреждение", "Файл не загружен")
+            logger.warning("Попытка запуска обработки без загруженного файла")
+            return
+
+        df = self.current_df
+        n_rows = self.spinBox.value()
+
+        save_file_path = self.app_context.save_dir
+        self.progressBar.setValue(0)
+
+        from gigachat_api_promt_normalize import run
+
+        self.thread = ProcessingThread(
+            run_function=run,
+            df=df,
+            num_rows=n_rows,
+            save_dir=save_file_path,
+            app_context=self.app_context,
+            prompt_text=prompt_text,
+            column_index=column_index
+        )
+
+        self.thread.progress.connect(self.update_progress)
+        self.thread.finished.connect(self.on_processing_finished)
+        self.thread.error.connect(self.on_processing_error)
+
         self.thread.start()
 
     def on_processing_finished(self, output_path, end_time):
