@@ -15,7 +15,13 @@ class PandasModel(QAbstractTableModel):
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            return str(self._df.iat[index.row(), index.column()])
+            value = self._df.iat[index.row(), index.column()]
+
+            if pd.isna(value):
+                return ""
+
+            return str(value)
+
         return None
 
     def headerData(self, section, orientation, role):

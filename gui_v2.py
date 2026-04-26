@@ -7,6 +7,7 @@ import datetime
 
 from MainWindow import Ui_MainWindow
 from drag_drop import DropLabel
+import gigachat_api_question_2
 from models import PandasModel
 from log_window import LogWindow
 from qt_log_handler import QtLogHandler
@@ -26,7 +27,7 @@ class ProcessingThread(QThread):
     finished = pyqtSignal(str, str)      # output_path, end_time
     error = pyqtSignal(str)              # текст ошибки
 
-    def __init__(self, run_function, df, save_dir, app_context, num_rows=None, prompt_text=None):
+    def __init__(self, run_function, df, save_dir, app_context, num_rows=None, prompt_text=None, column_index=None, position=None):
         """
         run_function - функция обработки
         df - текущий DataFrame
@@ -39,6 +40,8 @@ class ProcessingThread(QThread):
         self.num_rows = num_rows
         self.prompt_text = prompt_text
         self.start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.column_index = column_index
+        self.position = position
 
     def run(self):
         try:
@@ -53,6 +56,11 @@ class ProcessingThread(QThread):
                 kwargs["num_rows"] = self.num_rows
             if self.prompt_text is not None:
                 kwargs["prompt_text"] = self.prompt_text
+            if self.column_index is not None:
+                kwargs["column_index"] = self.column_index
+
+            if self.position is not None:
+                kwargs["position"] = self.position
 
             output_path = self.run_function(**kwargs)
             end_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -164,6 +172,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             model = PandasModel(df)
             self.tableView.setModel(model)
             self.tableView.resizeColumnsToContents()
+            self.comboBox.clear()
+            self.comboBox.addItems(self.current_df.columns.tolist())
+            self.comboBox_2.clear()
+            self.comboBox_2.addItems(self.current_df.columns.tolist())
 
             # spinbox
             n_rows = len(df)
@@ -253,6 +265,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
           self.log_window.show()
           self.log_window.raise_()
           self.log_window.activateWindow()
+          if self.radioButton.isChecked():
+                position = "right"
+          elif self.radioButton_2.isChecked():
+                position = "left"
+          else:
+                position = None  # на всякий случай   
+          print(position)             
 
     def closeEvent(self, event):
         logger.removeHandler(self.qt_log_handler)
@@ -260,8 +279,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         super().closeEvent(event)
 
     def on_start_clicked(self):
+        prompt_text = self.plainTextEdit_2.toPlainText().strip()
+        column_name = self.comboBox.currentText()
+        column_index = self.current_df.columns.get_loc(column_name)
 
-        prompt_text = self.plainTextEdit.toPlainText().strip()
+        if self.radioButton.isChecked():
+            position = "right"
+        elif self.radioButton_2.isChecked():
+            position = "left"
+        else:
+            position = "right"  # дефолт
 
         if not prompt_text:
             QtWidgets.QMessageBox.warning(self, "Ошибка", "Поле ввода не должно быть пустым")
@@ -282,7 +309,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.progressBar.setValue(0)
 
 
-        from gigachat_api_question_2 import run
+        # from gigachat_api_question_2 import run
+
+        from gigachat_api_promt_column import run
 
         self.thread = ProcessingThread(
             run_function=run,
@@ -290,7 +319,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             num_rows=n_rows,
             save_dir=save_file_path,
             app_context=self.app_context,
-            prompt_text=prompt_text
+            prompt_text=prompt_text,
+            column_index=column_index,
+            position=position
         )
 
         self.thread.progress.connect(self.update_progress)
@@ -312,7 +343,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # добавление в историю
         self.history_manager.add_prompt_history(
-            prompt=self.plainTextEdit.toPlainText().strip() or "Нормализация данных",
+            prompt=self.plainTextEdit_2.toPlainText().strip() or "Нормализация данных",
             file_path=output_path,
             start_time=self.thread.start_time,
             end_time=end_time
@@ -322,7 +353,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         n_rows = len(result_df)
         self.spinBox.setMaximum(n_rows) # макс значение - кол-во строк в файле
         self.spinBox.setValue(n_rows)
-        self.plainTextEdit.clear()
+        self.plainTextEdit_2.clear()
 
     def on_processing_error(self, error_message):
         logger.exception("Ошибка при обработке: %s", error_message)

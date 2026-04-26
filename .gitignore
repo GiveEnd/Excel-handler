@@ -16,6 +16,18 @@ merged_gigachat_finalfile.xlsx
 Requst
 gold_source.xlsx
 
+expanded.py
+gemini_api.py
+gemini_api_question.py
+gui.py
+gui.exe
+merge.py
+merge_gigachat.py
+gigachat_api.py
+
+benchmark/
+
+
 test.py
 1.ui
 2_2.ui
@@ -27,3 +39,7 @@ MainWindow(Old GUI V2).py
 test1.py
 3.ui
 3_1.ui
+3_2.ui
+gold70.xlsx
+norm70.xlsx
+pred.xlsx
