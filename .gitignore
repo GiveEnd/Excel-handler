@@ -3,6 +3,8 @@ Result_exsels/
 __pycache__/
 venv/
 handler data/
+build/
+dist/
 
 api_key.py
 api_key_gigachat.py
@@ -43,3 +45,4 @@ test1.py
 gold70.xlsx
 norm70.xlsx
 pred.xlsx
+main.spec
