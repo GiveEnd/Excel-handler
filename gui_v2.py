@@ -312,7 +312,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # from gigachat_api_question_2 import run
 
-        from gigachat_api_promt_column import run
+        # from gigachat_api_promt_column import run
+        from openai_api_promt_column import run
 
         self.thread = ProcessingThread(
             run_function=run,
@@ -353,7 +354,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         save_file_path = self.app_context.save_dir
         self.progressBar.setValue(0)
 
-        from gigachat_api_promt_normalize import run
+        # from gigachat_api_promt_normalize import run
+        from openai_api_promt_normalize import run
 
         self.thread = ProcessingThread(
             run_function=run,
@@ -467,8 +469,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # сброс прогрессбара
         self.progressBar.setValue(0)
 
-        from gigachat_api_normalize import run
+        # from gigachat_api_normalize import run
 
+        from openai_api_normalize import run
         # Создаём поток
         self.thread = ProcessingThread(
             run_function=run,

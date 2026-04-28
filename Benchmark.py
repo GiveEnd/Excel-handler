@@ -70,6 +70,38 @@ def levenshtein_similarity(gold_df, pred_df):
 
     return sum(similarities) / len(similarities)
 
+def levenshtein_per_column(gold_df, pred_df):
+    column_scores = {}
+
+    for col in gold_df.columns:
+        similarities = []
+
+        g_col = gold_df[col]
+        p_col = pred_df[col]
+
+        for g, p in zip(g_col, p_col):
+            g = "" if pd.isna(g) else str(g)
+            p = "" if pd.isna(p) else str(p)
+
+            print(f"\nСравниванение колонки: {col}\nЭталон:  '{g}'\nГотовое: '{p}'\n")
+
+            if g == "" and p == "":
+                similarities.append(1.0)
+                continue
+
+            dist = distance(g, p)
+            max_len = max(len(g), len(p))
+
+            if max_len == 0:
+                similarities.append(1.0)
+            else:
+                sim = 1 - dist / max_len
+                similarities.append(sim)
+
+        column_scores[col] = sum(similarities) / len(similarities)
+
+    return column_scores
+
 
 gold_df = pd.read_excel(GOLD_PATH)
 pred_df = pd.read_excel(PRED_PATH)
@@ -89,3 +121,9 @@ else:
     print(f"Точность по ячейкам: {cell_acc:.4f} ({cell_acc*100:.2f}%)")
     print(f"Точность по строкам: {row_acc:.4f} ({row_acc*100:.2f}%)")
     print(f"Похожесть (Левенштейн): {lev_sim:.4f} ({lev_sim*100:.2f}%)")
+
+    col_lev = levenshtein_per_column(gold_df, pred_df)
+
+    print("\nЛЕВЕНШТЕЙН ПО КОЛОНКАМ:")
+    for col, score in col_lev.items():
+        print(f"{col}: {score:.4f} ({score*100:.2f}%)")
